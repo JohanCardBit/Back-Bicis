@@ -20,7 +20,7 @@ exports.login = async (req, res) => {
                     process.env.SECRET_JWT_KEY,
                     { expiresIn: process.env.TOKEN_EXPIRE },
                 );
-                return res.status(200).json({ Welcome: `${user.nombre}`, token })
+                return res.status(200).json({ Welcome: `${user.nombre}`,role: user.role, token })
 
             } else {
                 return res.status(401).json({ msj: 'CONTRASENA INCORRECTA' })
