@@ -100,42 +100,45 @@ exports.postDevolver = async (req, res) => {
             return res.status(400).json({ msj: "ESTACION LLENA, NO SE PUEDE DEVOLVER A ESTA ESTACION" });
         }
 
-        // 🔹 Finalizamos alquiler
+
         alquilerActivo.estacionLlegada = estacionLlegada;
         alquilerActivo.fechaFin = new Date();
         alquilerActivo.activo = false;
         await alquilerActivo.save();
 
-        // 🔹 Actualizamos bicicleta
+
         bicicleta.estado = "disponible";
         bicicleta.estacion = estacionLlegada;
         await bicicleta.save();
 
-        // 🔹 Sumamos en estación de llegada
+
         await modeloEstaciones.findByIdAndUpdate(estacionLlegada, {
             $inc: { bicicletasDisponibles: 1 },
             $push: { bicicletas: bicicleta._id }
         });
 
-        // 🔹 Recargamos alquiler con populate
+
         let alquilerFinalizado = await alquilerModelo.findById(alquilerActivo._id)
             .populate("usuario", "nombre apellido")
             .populate("bicicleta", "serial")
             .populate("estacionSalida", "nombre")
             .populate("estacionLlegada", "nombre");
 
-        // 🔹 Calculamos duración (en minutos)
-        let duracionMs = new Date(alquilerFinalizado.fechaFin) - new Date(alquilerFinalizado.fechaInicio);
-        let duracionMin = Math.floor(duracionMs / 60000); // minutos
-        let duracionSeg = Math.floor((duracionMs % 60000) / 1000); // segundos
+
+        let duracionAlquiler = new Date(alquilerFinalizado.fechaFin) - new Date(alquilerFinalizado.fechaInicio);
+
+        let horas = Math.floor(duracionAlquiler / (1000 * 60 * 60));
+        let minutos = Math.floor((duracionAlquiler % (1000 * 60 * 60)) / (1000 * 60));
+        let segundos = Math.floor((duracionAlquiler % (1000 * 60)) / 1000);
 
         return res.status(200).json({
             msj: "ALQUILER FINALIZADO CORRECTAMENTE",
             alquiler: alquilerFinalizado,
             duracion: {
-                minutos: duracionMin,
-                segundos: duracionSeg,
-                totalMs: duracionMs
+                horas,
+                minutos,
+                segundos,
+                totalMs: duracionAlquiler
             }
         });
 
