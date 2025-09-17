@@ -34,6 +34,8 @@ ruta.post('/alquilar/create', middlewareJWT, alquiler.postAlquilar)
 ruta.post('/alquiler/devolver', middlewareJWT, alquiler.postDevolver)
 ruta.get('/alquiler/activos', middlewareJWT, alquiler.getAlquileresActivos);
 ruta.get('/alquiler/historial/user', middlewareJWT, alquiler.getHistorialAlquileresUser);
+ruta.get('/alquiler/activo/user', middlewareJWT, alquiler.getAlquilerActivoUser);
+
 
 
 // BICICLETAS

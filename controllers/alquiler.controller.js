@@ -60,7 +60,7 @@ exports.postAlquilar = async (req, res) => {
 
         await modeloEstaciones.findByIdAndUpdate(estacionSalida, {
             $inc: { bicicletasDisponibles: -1 },
-            $pull: { bicicletas: bicicleta._id } 
+            $pull: { bicicletas: bicicleta._id }
         });
 
         return res.status(201).json({ msj: "ALQUILER REGISTRADO CORRECTAMENTE", nuevoAlquiler });
@@ -100,32 +100,44 @@ exports.postDevolver = async (req, res) => {
             return res.status(400).json({ msj: "ESTACION LLENA, NO SE PUEDE DEVOLVER A ESTA ESTACION" });
         }
 
-
+        // 🔹 Finalizamos alquiler
         alquilerActivo.estacionLlegada = estacionLlegada;
         alquilerActivo.fechaFin = new Date();
         alquilerActivo.activo = false;
         await alquilerActivo.save();
 
-
-        let estacionSalida = bicicleta.estacion;
+        // 🔹 Actualizamos bicicleta
         bicicleta.estado = "disponible";
         bicicleta.estacion = estacionLlegada;
         await bicicleta.save();
 
-
-
-        await modeloEstaciones.findByIdAndUpdate(estacionSalida, {
-            $inc: { bicicletasDisponibles: -1 },
-            $pull: { bicicletas: bicicleta._id }
-        });
-
-
+        // 🔹 Sumamos en estación de llegada
         await modeloEstaciones.findByIdAndUpdate(estacionLlegada, {
             $inc: { bicicletasDisponibles: 1 },
             $push: { bicicletas: bicicleta._id }
         });
 
-        return res.status(200).json({ msj: "ALQUILER FINALIZADO CORRECTAMENTE", alquiler: alquilerActivo });
+        // 🔹 Recargamos alquiler con populate
+        let alquilerFinalizado = await alquilerModelo.findById(alquilerActivo._id)
+            .populate("usuario", "nombre apellido")
+            .populate("bicicleta", "serial")
+            .populate("estacionSalida", "nombre")
+            .populate("estacionLlegada", "nombre");
+
+        // 🔹 Calculamos duración (en minutos)
+        let duracionMs = new Date(alquilerFinalizado.fechaFin) - new Date(alquilerFinalizado.fechaInicio);
+        let duracionMin = Math.floor(duracionMs / 60000); // minutos
+        let duracionSeg = Math.floor((duracionMs % 60000) / 1000); // segundos
+
+        return res.status(200).json({
+            msj: "ALQUILER FINALIZADO CORRECTAMENTE",
+            alquiler: alquilerFinalizado,
+            duracion: {
+                minutos: duracionMin,
+                segundos: duracionSeg,
+                totalMs: duracionMs
+            }
+        });
 
     } catch (error) {
         return res.status(500).json({ msj: "ERROR AL FINALIZAR ALQUILER", detalle: error.message });
@@ -178,6 +190,23 @@ exports.getHistorialAlquileresUser = async (req, res) => {
     }
 }
 
+exports.getAlquilerActivoUser = async (req, res) => {
+    try {
+        let userID = req.decode.id;
+
+        let alquilerActivo = await alquilerModelo.findOne({ usuario: userID, activo: true })
+            .populate("bicicleta", "serial estado")
+            .populate("estacionSalida", "nombre ubicacion");
+
+        if (!alquilerActivo) {
+            return res.status(200).json({ alquiler: null, msj: "NO TIENES UN ALQUILER ACTIVO" });
+        }
+
+        return res.status(200).json({ alquiler: alquilerActivo, msj: "ALQUILER ACTIVO ENCONTRADO" });
+    } catch (error) {
+        return res.status(500).json({ msj: "ERROR AL CONSULTAR ALQUILER ACTIVO", detalle: error.message });
+    }
+};
 
 // exports.getHistorialAlquileres = async (req, res) => {
 //     try {
