@@ -48,4 +48,3 @@ ruta.delete('/bicicleta/delete/:id', middlewareJWT, bicicletas.deleteBicicleta) 
 
 module.exports = ruta;
 
-
