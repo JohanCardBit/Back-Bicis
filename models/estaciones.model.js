@@ -40,11 +40,8 @@ const esquemaEstaciones = mongoose.Schema({
 
     bicicletas: [
         {
-            biciId: {
-                type: mongoose.Schema.Types.ObjectId,
-                ref: "bicicleta"
-            },
-            serial: String
+            type: mongoose.Schema.Types.ObjectId,
+            ref: "Bicicleta"
         }
     ],
 
@@ -52,7 +49,7 @@ const esquemaEstaciones = mongoose.Schema({
         type: String
     },
 
-    activo:{
+    activo: {
         type: Boolean,
         default: true
     }

@@ -16,7 +16,7 @@ ruta.post('/login', login);                                                     
 
 // USUARIOS
 ruta.get('/users', middlewareJWT, user.getUsers)                                                                //OKK                    
-ruta.get('/user/:id', middlewareJWT, user.getOneUser)                                                           //OKK  REVISAR                          
+ruta.get('/user/me', middlewareJWT, user.getOneUser)                                                           //OKK                           
 ruta.put('/user/update/:id', middlewareJWT, user.putUser)                                                       //OKK                                
 
 

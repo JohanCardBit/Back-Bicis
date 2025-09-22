@@ -104,6 +104,17 @@ exports.postDevolver = async (req, res) => {
         alquilerActivo.estacionLlegada = estacionLlegada;
         alquilerActivo.fechaFin = new Date();
         alquilerActivo.activo = false;
+
+
+        let duracionMs = alquilerActivo.fechaFin - new Date(alquilerActivo.fechaInicio);
+        let duracionSeg = Math.floor(duracionMs / 1000);
+        let horas = Math.floor(duracionSeg / 3600);
+        let minutos = Math.floor((duracionSeg % 3600) / 60);
+        let segundos = duracionSeg % 60;
+
+        alquilerActivo.duracionMs = duracionMs;
+        alquilerActivo.duracionTexto = `${horas}h ${minutos}m ${segundos}s`;
+
         await alquilerActivo.save();
 
 
@@ -124,13 +135,6 @@ exports.postDevolver = async (req, res) => {
             .populate("estacionSalida", "nombre")
             .populate("estacionLlegada", "nombre");
 
-
-        let duracionAlquiler = new Date(alquilerFinalizado.fechaFin) - new Date(alquilerFinalizado.fechaInicio);
-
-        let horas = Math.floor(duracionAlquiler / (1000 * 60 * 60));
-        let minutos = Math.floor((duracionAlquiler % (1000 * 60 * 60)) / (1000 * 60));
-        let segundos = Math.floor((duracionAlquiler % (1000 * 60)) / 1000);
-
         return res.status(200).json({
             msj: "ALQUILER FINALIZADO CORRECTAMENTE",
             alquiler: alquilerFinalizado,
@@ -138,7 +142,7 @@ exports.postDevolver = async (req, res) => {
                 horas,
                 minutos,
                 segundos,
-                totalMs: duracionAlquiler
+                totalMs: duracionMs
             }
         });
 
@@ -146,7 +150,6 @@ exports.postDevolver = async (req, res) => {
         return res.status(500).json({ msj: "ERROR AL FINALIZAR ALQUILER", detalle: error.message });
     }
 };
-
 
 
 exports.getAlquileresActivos = async (req, res) => {
@@ -177,21 +180,48 @@ exports.getHistorialAlquileresUser = async (req, res) => {
     try {
         let userID = req.decode.id;
 
-        let historial = await alquilerModelo.find({ usuario: userID })
-            .populate("bicicleta", "serial estado")
-            .populate('estacionSalida', "nombre ubicacion")
-            .populate("estacionLlegada", "nombre ubicacion")
-            .sort({ fechaInicio: -1 });
-
-        if (!historial.length) {
-            return res.status(404).json({ msj: 'NO TIENES HISTORIAL DE ALQUILERES' })
+        if (!mongoose.Types.ObjectId.isValid(userID)) {
+            return res.status(400).json({ msj: "ID DE USUARIO INVALIDO" });
         }
 
-        return res.status(200).json(historial);
+        let historial = await alquilerModelo.find({ usuario: userID })
+            .populate("bicicleta", "serial")
+            .populate("estacionSalida", "nombre")
+            .populate("estacionLlegada", "nombre")
+            .sort({ fechaInicio: -1 });
+
+
+        let historialConDuracion = historial.map(alquiler => {
+            let duracionMs = alquiler.duracionMs || 0;
+            let horas = Math.floor(duracionMs / 3600000);
+            let minutos = Math.floor((duracionMs % 3600000) / 60000);
+            let segundos = Math.floor((duracionMs % 60000) / 1000);
+
+            return {
+                _id: alquiler._id,
+                bicicleta: alquiler.bicicleta,
+                estacionSalida: alquiler.estacionSalida,
+                estacionLlegada: alquiler.estacionLlegada,
+                fechaInicio: alquiler.fechaInicio,
+                fechaFin: alquiler.fechaFin,
+                activo: alquiler.activo,
+                duracion: {
+                    horas,
+                    minutos,
+                    segundos,
+                    totalMs: duracionMs
+                },
+                duracionTexto: alquiler.duracionTexto || `${horas}h ${minutos}m ${segundos}s`
+            };
+        });
+
+        return res.status(200).json({ msj: "HISTORIAL DE ALQUILERES", historial: historialConDuracion });
+
     } catch (error) {
-        return res.status(500).json({ msj: "ERROR AL CONSULTAR ALQUILERES", detalle: error.message });
+        return res.status(500).json({ msj: "ERROR AL OBTENER HISTORIAL", detalle: error.message });
     }
-}
+};
+
 
 exports.getAlquilerActivoUser = async (req, res) => {
     try {
@@ -205,7 +235,19 @@ exports.getAlquilerActivoUser = async (req, res) => {
             return res.status(200).json({ alquiler: null, msj: "NO TIENES UN ALQUILER ACTIVO" });
         }
 
-        return res.status(200).json({ alquiler: alquilerActivo, msj: "ALQUILER ACTIVO ENCONTRADO" });
+
+        const ahora = new Date();
+        const inicio = alquilerActivo.createdAt || alquilerActivo.horaInicio;
+        const diferenciaMs = ahora - inicio;
+
+        const horas = Math.floor(diferenciaMs / (1000 * 60 * 60));
+        const minutos = Math.floor((diferenciaMs % (1000 * 60 * 60)) / (1000 * 60));
+        const segundos = Math.floor((diferenciaMs % (1000 * 60)) / 1000);
+
+        const tiempoUso = `${horas}h ${minutos}m ${segundos}s`;
+
+        return res.status(200).json({ alquiler: alquilerActivo, tiempoUso, msj: "ALQUILER ACTIVO ENCONTRADO" });
+
     } catch (error) {
         return res.status(500).json({ msj: "ERROR AL CONSULTAR ALQUILER ACTIVO", detalle: error.message });
     }

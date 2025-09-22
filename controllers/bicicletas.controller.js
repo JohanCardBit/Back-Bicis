@@ -17,6 +17,12 @@ exports.postBicicleta = async (req, res) => {
             return res.status(400).json({ msj: "FALTAN DATOS (SERIAL Y ESTACION)" });
         }
 
+
+        const existe = await modeloBicicletas.findOne({ serial });
+        if (existe) {
+            return res.status(400).json({ msj: `YA EXISTE UNA BICICLETA CON EL SERIAL: ${serial}` });
+        }
+
         let dataEstacion;
 
         if (mongoose.Types.ObjectId.isValid(estacion)) {
@@ -35,6 +41,7 @@ exports.postBicicleta = async (req, res) => {
             return res.status(400).json({ msj: `ESTACION LLENA (${dataEstacion.capacidad})` });
         }
 
+
         let nuevaBici = new modeloBicicletas({
             serial,
             estado: "disponible",
@@ -42,14 +49,15 @@ exports.postBicicleta = async (req, res) => {
         });
 
         await nuevaBici.save();
+
+
         await modeloEstaciones.findByIdAndUpdate(
-            dataEstacion._id, {
-            $inc: { bicicletasDisponibles: 1 },
-            $push: {
-                bicicletas: nuevaBici._id,
-                serial: nuevaBici.serial
+            dataEstacion._id,
+            {
+                $inc: { bicicletasDisponibles: 1 },
+                $push: { bicicletas: nuevaBici._id }
             }
-        });
+        );
 
         return res.status(201).json({ msj: "BICICLETA CREADA", nuevaBici });
 
